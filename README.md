@@ -24,7 +24,9 @@
 
 ---
 
-## 2. 프로젝트 구조
+## 2. 구조
+
+### 프로젝트
 
 ```shell
 coupon-system
@@ -122,15 +124,31 @@ coupon-system
 └─gradle ...
 ```
 
----
-
-## 3. 기능별 설명
-
-### Docker 구조
+### Docker Container
 
 ![docker.png](docker.png)
 
 ---
 
-## 4. 주요 기능
+## 3. 100개의 선착순 쿠폰 발급 흐름
 
+### Kafka Producer (api)
+
+1. Client에서 동시에 1000번의 쿠폰 발급 Request
+2. Redis에서 Key가 applied_user인 Set 자료구조에서 해당 userId(value)가 존재하는지 확인(존재한다면 이미 쿠폰을 발급받은 상태)
+  - 발급을 받은 상태(0) : 쿠폰 발급 차단
+	- 발급을 받지 않은 상태(1) : 다음 로직 수행
+3. Redis -> "coupon_count"의 count 증가시킴
+	- 시스템에서 쿠폰을 한개 발급시켜준 상태
+	- 쿠폰 발급 갯수가 100 초과라면 발급 중지
+	- 그 이하라면 다음 로직 수행
+4. Kafka Producer를 통해 Topic(coupon_create)으로 데이터 전송
+	- send("coupon_create", userId)
+
+### Kafka Consumer (consumer)
+
+- KafkaListener
+	- topic: "coupon_create", groupId: "group_1"
+	- topic에서 userId를 가져와서 DB(coupon)에 저장
+	- 실패한 요청은 DB(failed_event)에 저장
+	- 실패한 객체들은 배치 프로그램을 통해 추후 일괄 처리
