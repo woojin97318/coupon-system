@@ -26,17 +26,17 @@ public class ApplyService {
      * 쿠폰 발급
      */
     public void apply(Long userId) {
-        Long apply = appliedUserRepository.add(userId);
-
-        if (apply != 1)
-            return;
-
-        Long count = couponCountRepository.increment();
-
-        if (count > 100) {
+        // userId에 대한 쿠폰 중복 발급 여부 확인
+        if (appliedUserRepository.add(userId) != 1) {
             return;
         }
 
-         couponCreateProducer.create(userId);
+        // 쿠폰의 잔여 갯수를 통해 발급 가능 여부 확인
+        if (couponCountRepository.increment() > 100) {
+            return;
+        }
+
+        // Kafka Topic(coupon_create)으로 userId 발행
+        couponCreateProducer.create(userId);
     }
 }
